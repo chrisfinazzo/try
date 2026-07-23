@@ -1408,8 +1408,31 @@ if __FILE__ == $0
     end
   end
 
+  # Emit best-effort terminal manager rename commands. Keep these as the final
+  # commands so a missing or broken optional CLI never prevents the directory
+  # change from completing.
+  def terminal_rename_commands(path)
+    name = File.basename(path).sub(/\A\d{4}-\d{2}-\d{2}-/, '')
+    label = "try: #{name}"
+
+    if ENV['HERDR_ENV'] == '1' && ENV['HERDR_PANE_ID'] && !ENV['HERDR_PANE_ID'].empty?
+      commands = [
+        "command -v herdr >/dev/null 2>&1 && herdr pane report-metadata #{q(ENV['HERDR_PANE_ID'])} --source try --title #{q(label)} >/dev/null 2>&1 || true"
+      ]
+      if ENV['HERDR_PANE_ID'].match?(/:p1\z/) && ENV['HERDR_WORKSPACE_ID'] && !ENV['HERDR_WORKSPACE_ID'].empty?
+        commands << "command -v herdr >/dev/null 2>&1 && herdr workspace rename #{q(ENV['HERDR_WORKSPACE_ID'])} #{q(label)} >/dev/null 2>&1 || true"
+      end
+      commands
+    elsif (ENV['CMUX_SOCKET_PATH'] && !ENV['CMUX_SOCKET_PATH'].empty?) ||
+          (ENV['CMUX_BUNDLE_ID'] && !ENV['CMUX_BUNDLE_ID'].empty?)
+      ["command -v cmux >/dev/null 2>&1 && cmux rename-tab #{q(label)} >/dev/null 2>&1 || true"]
+    else
+      []
+    end
+  end
+
   def script_cd(path)
-    ["touch #{q(path)}", "echo #{q(path)}", "cd #{q(path)}"]
+    ["touch #{q(path)}", "echo #{q(path)}", "cd #{q(path)}"] + terminal_rename_commands(path)
   end
 
   def script_mkdir_cd(path)
@@ -1463,7 +1486,7 @@ if __FILE__ == $0
       "mv #{q(old_name)} #{q(new_name)}",
       "echo #{q(new_path)}",
       "cd #{q(new_path)}"
-    ]
+    ] + terminal_rename_commands(new_path)
   end
 
   # Return a unique directory name under tries_path by appending -2, -3, ... if needed
