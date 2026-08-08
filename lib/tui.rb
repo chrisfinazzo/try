@@ -90,14 +90,14 @@ module Tui
   module Palette
     HEADER      = ANSI.sgr(1, "38;5;114")
     ACCENT      = ANSI.sgr(1, "38;5;214")
-    HIGHLIGHT   = "\e[1;33m"  # Bold yellow (matches C version)
+    HIGHLIGHT   = "\e[1m"  # Bold only, no fixed color: readable on any theme
     MUTED       = ANSI.fg(245)
     MATCH       = ANSI.sgr(1, "38;5;226")
     INPUT_HINT  = ANSI.fg(244)
     INPUT_CURSOR_ON  = "\e[7m"
     INPUT_CURSOR_OFF = "\e[27m"
 
-    SELECTED_BG = ANSI.bg(238)
+    SELECTED_BG = "\e[7m"  # reverse video: adapts to terminal's own colors, not just dark themes
     DANGER_BG   = ANSI.bg(52)
   end
 
