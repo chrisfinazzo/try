@@ -335,6 +335,60 @@ class FormattedEntryNameTest < TrySelectorTestCase
   end
 end
 
+class SelectedEntryRenderingTest < TrySelectorTestCase
+  def selector
+    @sel ||= build_selector
+  end
+
+  def test_selected_entry_does_not_use_fixed_muted_foreground
+    Tui.enable_colors!
+    screen = Tui::Screen.new(io: StringIO.new, width: 80, height: 5)
+    entry = TrySelector::TryEntry.new(
+      {
+        basename: "2024-01-15-project",
+        text: "2024-01-15-project",
+        path: File.join(@tmpdir, "2024-01-15-project"),
+        is_symlink: false,
+        mtime: Time.now,
+        highlight_positions: [11]
+      },
+      1.0,
+      []
+    )
+
+    selector.send(:render_entry_line, screen, entry, true, 80)
+    output = StringIO.new
+    screen.body.lines.first.render(output, 80)
+
+    assert_includes output.string, Tui::Palette::SELECTED_BG
+    assert_includes output.string, Tui::Palette::SELECTED_FG
+    assert_includes output.string, Tui::Palette::HIGHLIGHT
+    refute_includes output.string, Tui::Palette::MUTED
+    arrow_end = output.string.index("→ ") + 2
+    icon_start = output.string.index("📁")
+    fg_after_arrow = output.string.index(Tui::Palette::SELECTED_FG, arrow_end)
+    assert_operator fg_after_arrow, :<, icon_start
+    match_start = output.string.rindex(Tui::Palette::HIGHLIGHT)
+    fg_after_match = output.string.index(Tui::Palette::SELECTED_FG, match_start + 1)
+    assert fg_after_match, "selected foreground should be restored after a highlighted name"
+  end
+
+  def test_selected_create_row_restores_foreground
+    Tui.enable_colors!
+    screen = Tui::Screen.new(io: StringIO.new, width: 80, height: 5)
+    selector.instance_variable_set(:@input_buffer, "new-entry")
+
+    selector.send(:render_create_line, screen, true, 80)
+    output = StringIO.new
+    screen.body.lines.first.render(output, 80)
+
+    arrow_end = output.string.index("→ ") + 2
+    icon_start = output.string.index("📂")
+    fg_after_arrow = output.string.index(Tui::Palette::SELECTED_FG, arrow_end)
+    assert_operator fg_after_arrow, :<, icon_start
+  end
+end
+
 # -------------------------------------------------------------------
 # finalize_rename
 # -------------------------------------------------------------------

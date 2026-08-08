@@ -40,6 +40,7 @@ Each directory entry has two display components:
 - Directory icon (📁)
 - Directory name with fuzzy match highlighting
 - Truncated with ellipsis (`…`) if too long
+- Selected rows use a dark neutral background with a bright neutral foreground; date prefixes and right-aligned metadata inherit that foreground instead of forcing the fixed muted color, so they remain readable on light and dark themes.
 
 **Secondary Layer (right-aligned):**
 - Relative timestamp ("just now", "2h ago", "3d ago")

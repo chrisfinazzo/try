@@ -389,15 +389,15 @@ class TrySelector
 
   def render_entry_line(screen, entry, is_selected, width)
     is_marked = @marked_for_deletion.include?(entry[:path])
-    # Marked items always show red; selection shows via arrow only
+    # Marked items keep the danger background; selected rows add a readable foreground.
     background = if is_marked
-      Tui::Palette::DANGER_BG
+      Tui::Palette::DANGER_BG + (is_selected ? Tui::Palette::SELECTED_FG : "")
     elsif is_selected
-      Tui::Palette::SELECTED_BG
+      Tui::Palette::SELECTED_BG + Tui::Palette::SELECTED_FG
     end
 
     line = screen.body.add_line(background: background)
-    line.write << (is_selected ? Tui::Text.highlight("→ ") : "  ")
+    line.write << (is_selected ? Tui::Text.highlight("→ ") + selected_foreground : "  ")
     icon = if is_marked
       emoji("🗑️")
     elsif entry[:is_symlink]
@@ -407,7 +407,7 @@ class TrySelector
     end
     line.write << icon << " "
 
-    plain_name, rendered_name = formatted_entry_name(entry)
+    plain_name, rendered_name = formatted_entry_name(entry, selected: is_selected)
     prefix_width = 5
     meta_text = "#{format_relative_time(entry[:mtime])}, #{format('%.1f', entry[:score])}"
 
@@ -422,13 +422,15 @@ class TrySelector
     line.write << display_rendered
 
     # Right content is lower layer - will be overwritten by left if they overlap
-    line.right.write_dim(meta_text)
+    line.right.write(is_selected ? meta_text : Tui::Text.dim(meta_text))
   end
 
   def render_create_line(screen, is_selected, width)
-    background = is_selected ? Tui::Palette::SELECTED_BG : nil
+    background = if is_selected
+      Tui::Palette::SELECTED_BG + Tui::Palette::SELECTED_FG
+    end
     line = screen.body.add_line(background: background)
-    line.write << (is_selected ? Tui::Text.highlight("→ ") : "  ")
+    line.write << (is_selected ? Tui::Text.highlight("→ ") + selected_foreground : "  ")
     date_prefix = Time.now.strftime("%Y-%m-%d")
     label = if @input_buffer.empty?
       "📂 Create new: #{date_prefix}-"
@@ -438,7 +440,7 @@ class TrySelector
     line.write << label
   end
 
-  def formatted_entry_name(entry)
+  def formatted_entry_name(entry, selected: false)
     basename = entry[:basename]
     positions = entry[:highlight_positions] || []
 
@@ -447,17 +449,25 @@ class TrySelector
       name_part = $2
       date_len = date_part.length + 1  # +1 for the hyphen
 
-      rendered = Tui::Text.dim(date_part)
+      rendered = selected ? date_part : Tui::Text.dim(date_part)
       # Highlight hyphen if it's in positions
-      rendered += positions.include?(10) ? Tui::Text.highlight('-') : Tui::Text.dim('-')
-      rendered += highlight_with_positions(name_part, positions, date_len)
+      hyphen = if positions.include?(10)
+        Tui::Text.highlight('-')
+      elsif selected
+        '-'
+      else
+        Tui::Text.dim('-')
+      end
+      rendered += hyphen
+      rendered += selected_foreground if selected && positions.include?(10)
+      rendered += highlight_with_positions(name_part, positions, date_len, selected: selected)
       ["#{date_part}-#{name_part}", rendered]
     else
-      [basename, highlight_with_positions(basename, positions, 0)]
+      [basename, highlight_with_positions(basename, positions, 0, selected: selected)]
     end
   end
 
-  def highlight_with_positions(text, positions, offset)
+  def highlight_with_positions(text, positions, offset, selected: false)
     pos_set = positions.is_a?(Set) ? positions : positions.to_set
     result = String.new
     chars = text.chars
@@ -469,12 +479,17 @@ class TrySelector
         i += 1
         i += 1 while i < chars.length && pos_set.include?(i + offset)
         result << Tui::Text.highlight(chars[batch_start...i].join)
+        result << selected_foreground if selected
       else
         result << chars[i]
         i += 1
       end
     end
     result
+  end
+
+  def selected_foreground
+    Tui.colors_enabled? ? Tui::Palette::SELECTED_FG : ""
   end
 
   # Find the position of the previous word boundary for Ctrl-W deletion.
@@ -955,7 +970,7 @@ end
 # Main execution with OptionParser subcommands
 if __FILE__ == $0
 
-  VERSION = "1.10.0"
+  VERSION = "1.10.1"
 
   def print_global_help
     text = <<~HELP
